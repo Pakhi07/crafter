@@ -112,6 +112,8 @@ class Env(BaseClass):
         'semantic': self._sem_view(),
         'player_pos': self._player.pos,
         'reward': reward,
+        'player_health': self._player.health,
+        'player_position': self._player.pos,
     }
     if not self._reward:
       reward = 0.0
