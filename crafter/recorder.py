@@ -11,7 +11,7 @@ class Recorder:
         self, env, directory, save_stats=True, save_video=True,
         save_episode=True, video_size=(512, 512)
     ):
-        self._env = env
+        # self._env = env
         self._current_obs = None  # Store current observation
         if directory and save_stats:
             env = StatsRecorder(env, directory)
@@ -19,6 +19,7 @@ class Recorder:
             env = VideoRecorder(env, directory, video_size)
         if directory and save_episode:
             env = EpisodeRecorder(env, directory)
+        self._env = env
 
     def __getattr__(self, name):
         if name.startswith('__'):

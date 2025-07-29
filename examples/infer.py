@@ -3,7 +3,8 @@ import crafter
 import stable_baselines3
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
-# No external wrappers needed for this version
+from wrapper import CompatibilityWrapper
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -27,6 +28,7 @@ def main():
         save_episode=False
     )
     # The DummyVecEnv and VecTransposeImage are still needed for SB3
+    env = CompatibilityWrapper(env)
     env = DummyVecEnv([lambda: env])
     env = VecTransposeImage(env)
 
@@ -51,9 +53,8 @@ def main():
             episodes_ran += 1
             print(f"Episode {episodes_ran}/{args.episodes} finished (Reason: {'Timeout' if timed_out else 'Done'}).")
             
-            # If it was a timeout, we need to manually reset the environment
-            # This ensures the Recorder logs the episode before starting the next one.
             if timed_out:
+                print("time out")
                 obs = env.reset()
 
             steps_this_episode = 0 # Reset step counter for the new episode

@@ -16,12 +16,13 @@ class AnalysisCallback(BaseCallback):
         self.visited_states = defaultdict(int)
         self.actions = []
         self.positions = []
-        self.rewards = {'extrinsic': [], 'homeostatic': []}
+        self.rewards = []
         self.healths = []
         self.place_stone_actions = 0
         self.zombies_defeated = 0
         self.skeletons_defeated = 0
         self.wake_ups = 0
+        self.death_count = 0
         self.achievements_unlocked = defaultdict(int)
 
     def _on_step(self):
@@ -32,6 +33,9 @@ class AnalysisCallback(BaseCallback):
         
         if action_name == 'place_stone':
             self.place_stone_actions += 1
+        
+        if info.get('discount') == 0.0:
+            self.death_count += 1
 
         # Check for newly unlocked achievements in this step
         current_achievements = info.get('achievements', {})
@@ -47,17 +51,13 @@ class AnalysisCallback(BaseCallback):
         # Update our running count of achievements for the next step (only one line needed)
         self.achievements_unlocked.update(current_achievements)
 
-        self.rewards['extrinsic'].append(info.get('reward', 0))
-        self.rewards['homeostatic'].append(info.get('homeostatic_reward', 0))
+        self.rewards.append(info.get('reward', 0))
         self.actions.append(action)
         
-        # Access observation from the environment
-        # obs = self.training_env.get_attr('obs')[0]  # Get latest observation from DummyVecEnv
         obs = self.locals['new_obs'][0]
         state_key = str(obs.tobytes())
         self.visited_states[state_key] += 1
         
-        # Access player position and health
         self.healths.append(info.get('player_health', 0))
         self.positions.append(info.get('player_pos', (0, 0)))
         
@@ -78,20 +78,19 @@ class AnalysisCallback(BaseCallback):
         action_counts = np.bincount(self.actions, minlength=self.training_env.get_attr('action_space')[0].n)
         action_probs = action_counts / (action_counts.sum() + 1e-10)
         action_entropy = -np.sum(action_probs * np.log2(action_probs + 1e-10))
-        extrinsic_mean = np.mean(self.rewards['extrinsic'])
-        homeostatic_mean = np.mean(self.rewards['homeostatic'])
+        reward_mean = np.mean(self.rewards)
         health_mean = np.mean(self.healths) if self.healths else 0
         return {
             'exploration_variance': exploration_variance,
             'state_entropy': state_entropy,
             'action_entropy': action_entropy,
-            'extrinsic_reward_mean': extrinsic_mean,
-            'homeostatic_reward_mean': homeostatic_mean,
+            'reward_extrinsic_mean': reward_mean,
             'health_mean': health_mean,
             'total_zombie_defeated': self.zombies_defeated,
             'total_skeleton_defeated': self.skeletons_defeated,
             'total_wake_ups': self.wake_ups,
             'total_stones_placed': self.place_stone_actions,
+            'total_deaths': self.death_count,
         }
 
 def main():
@@ -103,15 +102,17 @@ def main():
     args = parser.parse_args()
 
     np.random.seed(args.seed)
-    env_class = crafter.Env if args.env == 'crafter' else homeostatic_crafter.Env
+    
+    env_class = crafter.Env
     env = env_class(seed=args.seed)
     env = crafter.Recorder(
         env,
         f"{args.outdir}/{args.env}_eval",
         save_stats=True,
         save_episode=False,
-        save_video=False
+        save_video=True,
     )
+    
     env = CompatibilityWrapper(env)
     env = DummyVecEnv([lambda: env])
     env = VecTransposeImage(env)

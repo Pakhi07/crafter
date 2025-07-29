@@ -37,10 +37,12 @@ def main():
     done = False
     while not done:
       action = random.randint(0, env.action_space.n)
-      obs, reward, done, info = env.step(action)
+      obs, reward, done, truncated, info = env.step(action)
+      done = done | truncated
+
     duration = time.time() - start
     step = env._step
-    print(f'Step time: {1000*duration/step:.2f}ms ({int(step/duration)} FPS)')
+    print(f'Step time: {1000 * duration/step:.2f}ms ({int(step/duration)} FPS)')
     print('Episode length:', step)
 
 

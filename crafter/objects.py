@@ -67,11 +67,18 @@ class Object:
 
 class Player(Object):
 
-  def __init__(self, world, pos):
+  def __init__(self, world, pos, random_internal: bool):
     super().__init__(world, pos)
     self.facing = (0, 1)
     self.inventory = {
         name: info['initial'] for name, info in constants.items.items()}
+    
+    if random_internal:
+            self.inventory["health"] = 6 + np.random.randint(constants.items["health"]["max"] - 5)
+            self.inventory["food"] = 4 + np.random.randint(constants.items["food"]["max"] - 3)
+            self.inventory["drink"] = 4 + np.random.randint(constants.items["drink"]["max"] - 3)
+            self.inventory["energy"] = 4 + np.random.randint(constants.items["energy"]["max"] - 3)
+
     self.achievements = {name: 0 for name in constants.achievements}
     self.action = 'noop'
     self.sleeping = False
@@ -80,6 +87,12 @@ class Player(Object):
     self._thirst = 0
     self._fatigue = 0
     self._recover = 0
+
+    self._monitor_smoother = 0.05
+    self._health_monitor = self.inventory["health"]
+    self._food_monitor = self.inventory["food"]
+    self._drink_monitor = self.inventory["drink"]
+    self._energy_monitor = self.inventory["energy"]
 
   @property
   def texture(self):

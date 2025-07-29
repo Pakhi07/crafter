@@ -25,11 +25,19 @@ except ImportError:
 class Env(BaseClass):
 
   def __init__(
-      self, area=(64, 64), view=(9, 9), size=(64, 64),
-      reward=True, length=10000, seed=None):
+      self, area=(64, 64), 
+      view=(9, 9), 
+      size=(64, 64),
+      reward=True, 
+      length=10000, 
+      seed=None,
+      random_internal=False,
+      ):
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
+    self._random_internal = random_internal
+
     self._area = area
     self._view = view
     self._size = size
@@ -53,7 +61,7 @@ class Env(BaseClass):
     self._unlocked = None
     # Some libraries expect these attributes to be set.
     self.reward_range = None
-    self.metadata = None
+    # self.metadata = None
 
   @property
   def observation_space(self):
@@ -67,7 +75,7 @@ class Env(BaseClass):
   def action_names(self):
     return constants.actions
 
-  def reset(self):
+  def reset(self, seed=None):
     if seed is not None:
             self._seed = seed
             
@@ -76,11 +84,26 @@ class Env(BaseClass):
     self._step = 0
     self._world.reset(seed=hash((self._seed, self._episode)) % (2 ** 31 - 1))
     self._update_time()
-    self._player = objects.Player(self._world, center)
+    self._player = objects.Player(self._world, center, random_internal=self._random_internal)
+
     self._last_health = self._player.health
+
     self._world.add(self._player)
     self._unlocked = set()
     worldgen.generate_world(self._world, self._player)
+
+    info = {
+            'inventory'   : self._player.inventory.copy(),
+            'achievements': self._player.achievements.copy(),
+            'discount'    : 1 - float(False),
+            'semantic'    : self._sem_view(),
+            'player_pos'  : self._player.pos,
+            'reward'      : None,
+            # 'interoception': intero_now,
+            'daylight': self._world.daylight,
+            'step': self._step,
+            'player_health': self._player.health,
+        }
     return self._obs()
 
   def step(self, action):
@@ -96,9 +119,13 @@ class Env(BaseClass):
         # center = (xmax - xmin) // 2, (ymax - ymin) // 2
         # if self._player.distance(center) < 4 * max(self._view):
         self._balance_chunk(chunk, objs)
+
     obs = self._obs()
+
     reward = (self._player.health - self._last_health) / 10
+
     self._last_health = self._player.health
+
     unlocked = {
         name for name, count in self._player.achievements.items()
         if count > 0 and name not in self._unlocked}
@@ -116,6 +143,8 @@ class Env(BaseClass):
         'semantic': self._sem_view(),
         'player_pos': self._player.pos,
         'reward': reward,
+        'daylight'       : self._world.daylight,
+        'step'        : self._step,
         'player_health': self._player.health,
     }
     if not self._reward:
