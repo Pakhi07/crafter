@@ -8,6 +8,11 @@ from . import objects
 from . import worldgen
 
 
+
+
+
+
+
 # Gym is an optional dependency.
 try:
   import gym
@@ -15,6 +20,7 @@ try:
   BoxSpace = gym.spaces.Box
   DictSpace = gym.spaces.Dict
   BaseClass = gym.Env
+
 except ImportError:
   DiscreteSpace = collections.namedtuple('DiscreteSpace', 'n')
   BoxSpace = collections.namedtuple('BoxSpace', 'low, high, shape, dtype')
@@ -33,10 +39,13 @@ class Env(BaseClass):
       seed=None,
       random_internal=False,
       ):
+
+
     view = np.array(view if hasattr(view, '__len__') else (view, view))
     size = np.array(size if hasattr(size, '__len__') else (size, size))
     seed = np.random.randint(0, 2**31 - 1) if seed is None else seed
     self._random_internal = random_internal
+
 
     self._area = area
     self._view = view
@@ -99,7 +108,6 @@ class Env(BaseClass):
             'semantic'    : self._sem_view(),
             'player_pos'  : self._player.pos,
             'reward'      : None,
-            # 'interoception': intero_now,
             'daylight': self._world.daylight,
             'step': self._step,
             'player_health': self._player.health,
@@ -135,7 +143,6 @@ class Env(BaseClass):
     dead = self._player.health <= 0
     over = self._length and self._step >= self._length
     done = dead or over
-    truncated = over and not dead
     info = {
         'inventory': self._player.inventory.copy(),
         'achievements': self._player.achievements.copy(),
@@ -149,7 +156,7 @@ class Env(BaseClass):
     }
     if not self._reward:
       reward = 0.0
-    return obs, reward, done, truncated, info
+    return obs, reward, done, info
 
   def render(self, size=None):
     size = size or self._size

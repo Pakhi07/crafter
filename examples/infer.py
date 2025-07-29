@@ -1,9 +1,7 @@
 import argparse
 import crafter
-import stable_baselines3
 from stable_baselines3 import PPO
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
-from wrapper import CompatibilityWrapper
 
 
 def main():
@@ -15,11 +13,7 @@ def main():
     parser.add_argument('--max_steps', type=int, default=2000, help='Max steps per evaluation episode.')
     args = parser.parse_args()
 
-    # --- 1. Set up the environment ---
-    print("Setting up standard Crafter for evaluation.")
     env = crafter.Env()
-        
-    # --- 2. Add the necessary wrappers ---
     env = crafter.Recorder(
         env,
         args.outdir,
@@ -27,37 +21,28 @@ def main():
         save_video=False,
         save_episode=False
     )
-    # The DummyVecEnv and VecTransposeImage are still needed for SB3
-    env = CompatibilityWrapper(env)
+
     env = DummyVecEnv([lambda: env])
     env = VecTransposeImage(env)
 
-    # --- 3. Load the pre-trained model ---
     print(f"Loading model from: {args.model_path}")
     model = PPO.load(args.model_path)
     
-    # --- 4. Run the evaluation loop with corrected timeout logic ---
+    episodes_ran = 0   
     obs = env.reset()
-    episodes_ran = 0
     steps_this_episode = 0
 
     while episodes_ran < args.episodes:
         action, _states = model.predict(obs, deterministic=True)
-        obs, rewards, dones, info = env.step(action)
+        obs, reward, done, info = env.step(action)
         steps_this_episode += 1
 
-        # Check if the episode ended naturally (done flag) or via timeout
         timed_out = steps_this_episode >= args.max_steps
-        
-        if dones[0] or timed_out:
+        if done or timed_out:
             episodes_ran += 1
-            print(f"Episode {episodes_ran}/{args.episodes} finished (Reason: {'Timeout' if timed_out else 'Done'}).")
-            
-            if timed_out:
-                print("time out")
-                obs = env.reset()
-
-            steps_this_episode = 0 # Reset step counter for the new episode
+            print(f"Episode {episodes_ran}/{args.episodes} finished (Reason: {'Timeout' if timed_out else 'Done'}).")   
+            obs = env.reset()
+            steps_this_episode = 0 
     
     env.close()
     print(f"\nEvaluation finished. Achievement stats saved in {args.outdir}/stats.jsonl")
