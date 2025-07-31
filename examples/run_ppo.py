@@ -126,7 +126,7 @@ def main():
     env = env_class(seed=args.seed)
     env = crafter.Recorder(
         env,
-        f"{args.outdir}/{args.env}_eval",
+        f"{args.outdir}/{args.env}_eval/seed_{args.seed}",
         save_stats=True,
         save_episode=False,
         save_video=False,
