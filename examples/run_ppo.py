@@ -1,6 +1,6 @@
 import crafter
 from stable_baselines3 import PPO
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import BaseCallback, CheckpointCallback, CallbackList
 from stable_baselines3.common.vec_env import DummyVecEnv, VecTransposeImage
 import numpy as np
 from collections import defaultdict
@@ -70,6 +70,11 @@ class AnalysisCallback(BaseCallback):
             for key, value in metrics.items():
                 self.logger.record(f'custom/{key}', value)
             print(f"Step {self.n_calls}: Logged metrics to TensorBoard.")
+
+            self.rewards.clear()
+            self.healths.clear()
+            self.positions.clear()
+            self.actions.clear()
             torch.cuda.empty_cache()
         
         return True
@@ -108,6 +113,14 @@ def main():
     args = parser.parse_args()
 
     np.random.seed(args.seed)
+
+    checkpoint_callback = CheckpointCallback(
+        save_freq=100_000,  # save every 100k steps (adjust as needed)
+        save_path=args.outdir,
+        name_prefix=f"{args.env}_seed{args.seed}_checkpoint",
+        save_replay_buffer=True,
+        save_vecnormalize=True,
+    )
     
     env_class = crafter.Env
     env = env_class(seed=args.seed)
@@ -130,8 +143,10 @@ def main():
         seed=args.seed
     )
 
-    callback = AnalysisCallback(log_interval=4096)
+    callback = CallbackList([AnalysisCallback(log_interval=4096), checkpoint_callback])
+    
     print(f"Starting {args.env} training with seed {args.seed}. Logs in {args.outdir}")
+    
     model.learn(
         total_timesteps=int(args.steps),
         callback=callback
